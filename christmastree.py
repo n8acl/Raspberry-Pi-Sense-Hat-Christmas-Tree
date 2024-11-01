@@ -4,6 +4,8 @@ from sense_hat import SenseHat
 import time
 import random
 from time import sleep
+import requests
+import json
 
 sense = SenseHat()
 
@@ -14,7 +16,13 @@ green        = [0,252,0]     # green
 brown        = [208,220,48]    # brown (Maybe look for a better brown, but there doesn't seem to be one)
 red          = [252,0,0]     # red
 cyan         = [0,252,252] # cyan - not used at the moment
-
+blue         = [0,0,255]
+oldlace      = [248,252,248] # white
+purple       = [127,0,255]
+magenta      = [255,0,127]
+yellow       = [255,255,0]
+orange       = [255,128,0]
+pink         = [255,153,255]
 ###########################################################################################################################################
 #Variables section (change these to change the way the program behaves. Let everything else alone.
 #Timing parameters (how often things change)
@@ -22,16 +30,18 @@ twinkleInterval = 0.01                        #Interval in seconds between chang
 defaultTreetopInterval = int(1 / twinkleInterval)    #Number of seconds between top light turning on and off. Will be adjusted based on speed of barometer change.
 treetopInterval = defaultTreetopInterval
 treeDies = False                              #Turn a bug into a feature - if true, the tree gradually turns brown (takes about 2 days)
-quietTimeStartHour = 23                       #Time to turn display off and on (mostly for people who are bugged by the lights at night)
+quietTimeStartHour = 22                       #Time to turn display off and on (mostly for people who are bugged by the lights at night)
 quietTimeStartMinute = 0
-activeTimeStartHour = 7
+activeTimeStartHour = 8
 activeTimeStartMinute = 0
 treeAlwaysActive = False                       #If True, tree is always on regardless of clock settings.
 sense.low_light = True                        #Start with dim lights - it just looks better.
 barometerInterval = 3600 * 2   # Update barometer value array size - two hours so we can compare old to new values
-blinkingBarometer = True   # Enable tree topper as barometric pressure indicator
+blinkingBarometer = False   # Enable tree topper as barometric pressure indicator
+cheerlights_topper = True   # Enable CheerLights as the tree topper
 barometerTolerance = 0.01  # parameter for tuning the sensitivity of the barometer LED
 fastBarometerTolerance = 0.02   #parameter for showing faster flash if barometer is rising or falling rapidly
+cheerlights_api_url = 'http://api.thingspeak.com/channels/1417/field/2/last.json'
 #End of variables section
 ###########################################################################################################################################
 
@@ -127,7 +137,19 @@ def avgPressure(baromArr, phase):            #Get the average pressure for the f
     avg = avg / period                            #We could return the total instead of the average, but this would be easier to debug if needed
     avg = int(avg * 1000) / 1000.               #Round to three decimal places so we can do the math later
     return avg
-        
+
+def use_api():
+    r = requests.get(cheerlights_api_url, timeout=None)
+    json = r.json()
+    return json['field2']
+
+# def script_state(state):
+#     publish.single(script_topic,state,hostname=my_broker)
+
+def hex_to_rgb(col_hex):
+    """Convert a hex colour to an RGB tuple."""
+    col_hex = col_hex.lstrip('#')
+    return bytearray.fromhex(col_hex)        
 
 barometerTimer = 0      #Initialize counter
 currentPressure = int(mToi(sense.get_pressure()) * 100) / 100.
@@ -212,9 +234,11 @@ while True:
             else:
                 pass          #Nothing changes
             print (oldAvg, currAvg, abs(oldAvg - currAvg))
-                    
+        elif cheerlights_topper:  # If instead of using the Baraometer, this will use the CheerLights system to flash the topper the current Color
+            r,g,b = hex_to_rgb(use_api())
+            dotColor = [r,g,b]
         else:
-            dotColor = red              #If we're not using the barometer, make the tree top flash red, because it looks nice
+            dotColor = red              #If we're not using the barometer or CheerLights, make the tree top flash red, because it looks nice
 ####end of barometer code
 
         top = sense.get_pixel(4,0)
